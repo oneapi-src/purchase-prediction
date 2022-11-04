@@ -1,0 +1,4 @@
+Link for data download:
+https://www.kaggle.com/code/fabiendaniel/customer-segmentation/data
+
+Note: Please see this dataset's applicable license for terms and conditions. Intel does not own the rights to this data set and does not confer any rights to it.
