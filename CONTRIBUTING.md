@@ -2,7 +2,7 @@
 
 ### License
 
-Purchase Prediction is licensed under the terms in [LICENSE]<https://github.com/oneapi-src/purchase-prediction/LICENSE>. By contributing to the project, you agree to the license and copyright terms therein and release your contribution under these terms.
+Purchase Prediction is licensed under the terms in [LICENSE](https://github.com/oneapi-src/purchase-prediction/blob/main/LICENSE). By contributing to the project, you agree to the license and copyright terms therein and release your contribution under these terms.
 
 ### Sign your work
 

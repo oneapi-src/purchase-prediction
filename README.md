@@ -320,6 +320,12 @@ for training models.
 Intel® Extension for Scikit-learn 2021.5.1 offers prediction time speed-up ranging between <b>20.48x</b> and <b>22.42x</b> compared to 
 stock Scikit-learn 1.0.2 with k Nearest Neighbor models.
 
+## Notices & Disclaimers
+Performance varies by use, configuration and other factors. Learn more on the [Performance Index site](https://edc.intel.com/content/www/us/en/products/performance/benchmarks/overview/).<br>
+Performance results are based on testing as of dates shown in configurations and may not reflect all publicly available updates.  See backup for configuration details.  No product or component can be absolutely secure. <br>
+Your costs and results may vary. <br>
+Intel technologies may require enabled hardware, software or service activation.<br>
+© Intel Corporation.  Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries.  Other names and brands may be claimed as the property of others.  <br>
 
 ## Conclusion
 To build a customer segmentation solution at scale, Data Scientists will need to train models for substantial datasets and run inference more frequently.The ability to accelerate training will allow them to train more frequently and achieve better accuracy. Besides training, faster speed in inference will allow them to run prediction in real-time scenarios as well as more frequently. A Data Scientist will also look at data classification to tag and categorize data so that it can be better understood and analyzed. This task requires a lot of training and retraining, making the job tedious. The ability to get it faster speed will accelerate the ML pipeline. This reference kit implementation provides performance-optimized guide around customer purchase prediction use cases that can be easily scaled across similar use cases.
@@ -331,6 +337,10 @@ To build a customer segmentation solution at scale, Data Scientists will need to
 ## Appendix
 
 ### **Experiment setup**
+- Testing performed on: October 2022
+- Testing performed by: Intel Corporation
+- Configuration Details: Azure D4v5 (Intel® Xeon® Platinum 8370C CPU @ 2.80GHz), 1 Socket, 2 Cores per Socket, 2 Threads per Core, Turbo:On, Total Memory: 16 GB, OS: Ubuntu 20.04, Kernel: Linux 5.13.0-1031-azure, Software: Scikit-Learn* v1.0.2, Intel® Extension for Scikit-Learn* v2021.5.1
+
 
 | **Optimized for**:                | **Description**
 | :---                              | :---
