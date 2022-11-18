@@ -315,7 +315,7 @@ and Intel scikit-learn extension python package distribution for the model build
 Intel® Extension for Scikit-learn-2021.5.1 offers training time speed-up upto <b>1.56x</b> compared to Scikit-learn-1.0.2 with k Nearest Neighbor model 
 for training models.
 
-![image](assets/kNN_inference.png)
+![image](assets/knn_inference.png)
 
 Intel® Extension for Scikit-learn 2021.5.1 offers prediction time speed-up ranging between <b>20.48x</b> and <b>22.42x</b> compared to 
 stock Scikit-learn 1.0.2 with k Nearest Neighbor models.
