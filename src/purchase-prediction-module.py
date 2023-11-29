@@ -2,7 +2,7 @@
    This code base is adopted from the below notebook
    https://www.kaggle.com/code/fabiendaniel/customer-segmentation/notebook
 '''
-# Copyright (C) 2022 Intel Corporation
+# Copyright (C) 2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 
 import os
@@ -10,23 +10,21 @@ import sys
 import argparse
 import time
 import datetime
-import warnings
 import logging
-import numpy as np
+import warnings
 import pandas as pd
+import numpy as np
 import nltk
-import joblib
+from joblib import load, dump
 
-
-warnings.filterwarnings("ignore")
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Ensure that the required NLTK libraries are downloaded
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
 
 # Declaring the path where the Models will be saved and loaded from
-rfc_model = 'model/rfc_model.joblib'
-knn_model = 'model/knn_model.joblib'
-dtc_model = 'model/dtc_model.joblib'
+rfc_model = 'output/models/rfc_model.joblib'
+knn_model = 'output/models/knn_model.joblib'
+dtc_model = 'output/models/dtc_model.joblib'
 
 # Hyperparamter tuning, saving & loading of Machine Learning models
 def hyperparameter_tuning(algorithm, param_grid, kFold):
@@ -37,7 +35,7 @@ def hyperparameter_tuning(algorithm, param_grid, kFold):
     return estimator, model
 
 def save_model(estimator, modelname):
-    print("Saving the model ...")
+    logger.info("Saving the model ...")
     try:
         dump(estimator, modelname)
     except Exception as e:
@@ -46,7 +44,7 @@ def save_model(estimator, modelname):
 
 def load_model(modelname):
     try:
-        print("Model loading ...")
+        logger.info("Model loading ...")
         loaded_model = load(modelname)
     except Exception as e:
         raise IOError("Error loading model data from disk: {}".format(str(e))) from e
@@ -55,9 +53,7 @@ def load_model(modelname):
 def iter_minibatches(chunksize):
     # Provide chunks one by one
     chunkstartmarker = 0
-    #while chunkstartmarker < numtrainingpoints:
     while chunkstartmarker < len(X_train):
-        #chunkrows = range(chunkstartmarker,chunkstartmarker+chunksize)
         chunkrows = chunkstartmarker+chunksize
         X_chunk, Y_chunk = X_train[chunkstartmarker:chunkrows], Y_train[chunkstartmarker:chunkrows]
         yield X_chunk, Y_chunk
@@ -89,12 +85,6 @@ if __name__ == "__main__":
                         required=False,
                         default='0',
                         help='hyper parameter tuning (0/1). Along with Hyperparamter tuning, the model is saved ')
-    parser.add_argument('-s',
-                        '--stock',
-                        type=str,
-                        required=False,
-                        default='0',
-                        help='Use Stock Python (0/1)')
     parser.add_argument('-alg',
                         '--algorithm',
                         type=str,
@@ -115,22 +105,34 @@ if __name__ == "__main__":
                         default='0',
                         help='Perform Inference on the saved models.Specify the model file with path i.e knn_model or rfc_model or dtc_model')
     
+    parser.add_argument('-l',
+                        '--logfile',
+                        type=str,
+                        default="",
+                        help="log file to output benchmarking results to")
+    
     FLAGS = parser.parse_args()
-    # pkg = FLAGS.package
+
+    if FLAGS.logfile == "":
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(filename=FLAGS.logfile, level=logging.DEBUG)
+
+    logger = logging.getLogger(__name__)
+    logging.getLogger('sklearnex').setLevel(logging.WARNING)
+
     finaltraindata = FLAGS.final_train_data
     dataaugfactor = FLAGS.data_aug_factor
     rawtraindata = FLAGS.raw_train_data
     algorithm = FLAGS.algorithm
     inference = FLAGS.inference
     tuning = True if FLAGS.tuning == '1' else False
-    stock = True if FLAGS.stock == '1' else False
     batch_size = FLAGS.batch_size
 
     prgstime = time.time()
-
-    if stock is False:
-        from sklearnex import patch_sklearn  # pylint: disable=import-error
-        patch_sklearn()
+    
+    from sklearnex import patch_sklearn  # pylint: disable=import-error
+    patch_sklearn()
     from sklearn.preprocessing import StandardScaler
     from sklearn.cluster import KMeans
     from sklearn.metrics import silhouette_samples, silhouette_score
@@ -139,18 +141,18 @@ if __name__ == "__main__":
     from sklearn.model_selection import GridSearchCV
     from sklearn import neighbors
     from sklearn import linear_model
-    # from sklearn import svm
     from sklearn import tree
     from sklearn import ensemble
     from sklearn.decomposition import PCA
-    from joblib import load, dump
+
+    warnings.filterwarnings('ignore')
 
     if finaltraindata == '0':
         # read the datafile
         try:
             # write some code
             # that might throw exception
-            print(f'Reading raw data from csv file {rawtraindata}...')
+            logger.info(f'Reading raw data from csv file {rawtraindata}...')
             df_initial = pd.read_csv(rawtraindata, encoding="ISO-8859-1",
                                      dtype={'CustomerID': str, 'InvoiceID': str})
         except FileNotFoundError:
@@ -161,20 +163,20 @@ if __name__ == "__main__":
         # ______
         df_initial['InvoiceDate'] = pd.to_datetime(df_initial['InvoiceDate'])
         # ____________________________________________________________
-        # gives some infos on columns types and numer of null values
+        # gives some infos on columns types and number of null values
         tab_info = pd.DataFrame(df_initial.dtypes).T.rename(index={0: 'column type'})
-        tab_info = tab_info.append(pd.DataFrame(df_initial.isnull().sum()).T.rename(index={0: 'null values (nb)'}))
-        tab_info = tab_info.append(pd.DataFrame(df_initial.isnull().sum() / df_initial.shape[0] * 100).T.
-                                   rename(index={0: 'null values (%)'}))
+        tab_info = pd.concat([tab_info, pd.DataFrame(df_initial.isnull().sum()).T.rename(index={0: 'null values (nb)'})])
+        tab_info = pd.concat([tab_info, pd.DataFrame(df_initial.isnull().sum() / df_initial.shape[0] * 100).T.
+                                   rename(index={0: 'null values (%)'})])
         df_initial.dropna(axis=0, subset=['CustomerID'], inplace=True)
-        print('Dataframe dimensions:', df_initial.shape)
+        print('Dataframe dimensions after removing null values:', df_initial.shape)
         # ____________________________________________________________
-        # gives some infos on columns types and numer of null values
+        # gives some infos on columns types and number of null values
         tab_info = pd.DataFrame(df_initial.dtypes).T.rename(index={0: 'column type'})
-        tab_info = tab_info.append(pd.DataFrame(df_initial.isnull().sum()).T.rename(index={0: 'null values (nb)'}))
-        tab_info = tab_info.append(pd.DataFrame(df_initial.isnull().sum() / df_initial.shape[0] * 100).T.
-                                   rename(index={0: 'null values (%)'}))
-        print('Entrées dupliquées: {}'.format(df_initial.duplicated().sum()))
+        tab_info = pd.concat([tab_info, pd.DataFrame(df_initial.isnull().sum()).T.rename(index={0: 'null values (nb)'})])
+        tab_info = pd.concat([tab_info, pd.DataFrame(df_initial.isnull().sum() / df_initial.shape[0] * 100).T.
+                                   rename(index={0: 'null values (%)'})])
+        logger.info('Duplicated entries: {}'.format(df_initial.duplicated().sum()))
         df_initial.drop_duplicates(inplace=True)
 
         temp = df_initial[['CustomerID', 'InvoiceNo', 'Country']].groupby(['CustomerID', 'InvoiceNo', 'Country']).count()
@@ -247,25 +249,21 @@ if __name__ == "__main__":
         df_cleaned.drop(entry_to_remove, axis=0, inplace=True)
         df_cleaned.drop(doubtfull_entry, axis=0, inplace=True)
         remaining_entries = df_cleaned[(df_cleaned['Quantity'] < 0) & (df_cleaned['StockCode'] != 'D')]
-        # remaining_entries[:5]
-        # df_cleaned[(df_cleaned['CustomerID'] == 14048) & (df_cleaned['StockCode'] == '22464')]
         list_special_codes = df_cleaned[df_cleaned['StockCode'].str.contains('^[a-zA-Z]+', regex=True)]['StockCode'].unique()
         df_cleaned['TotalPrice'] = df_cleaned['UnitPrice'] * (df_cleaned['Quantity'] - df_cleaned['QuantityCanceled'])
-        # df_cleaned.sort_values('CustomerID')[:5]
 
-        # somme des achats / utilisateur & commande
+        # sum of purchases / user & order
         temp = df_cleaned.groupby(by=['CustomerID', 'InvoiceNo'], as_index=False)['TotalPrice'].sum()
         basket_price = temp.rename(columns={'TotalPrice': 'Basket Price'})
-        # date de la commande
+        # date of order
         df_cleaned['InvoiceDate_int'] = df_cleaned['InvoiceDate'].astype('int64')
         temp = df_cleaned.groupby(by=['CustomerID', 'InvoiceNo'], as_index=False)['InvoiceDate_int'].mean()
         df_cleaned.drop('InvoiceDate_int', axis=1, inplace=True)
         basket_price.loc[:, 'InvoiceDate'] = pd.to_datetime(temp['InvoiceDate_int'])
-        # selection des entrées significatives:
+        # selection of significant entries:
         basket_price = basket_price[basket_price['Basket Price'] > 0]
-        # basket_price.sort_values('CustomerID')[:6]
 
-        # Décompte des achats
+        # Purchase countdown
         price_range = [0, 50, 100, 200, 500, 1000, 5000, 50000]
         count_price = []
         for i, price in enumerate(price_range):
@@ -278,17 +276,14 @@ if __name__ == "__main__":
             '''Noun validation'''
             return pos[:2] == 'NN'
 
-        # is_noun = lambda pos: pos[:2] == 'NN'
-
-        def keywords_inventory(dataframe, colonne='Description'):
+        def keywords_inventory(dataframe, column='Description'):
             '''Stemming'''
             stemmer = nltk.stem.SnowballStemmer("english")
             keywords_roots = dict()  # collect the words / root
             keywords_select = dict()  # association: root <-> keyword
             category_keys = []
             count_keywords = dict()
-            # icount = 0
-            for s in dataframe[colonne]:
+            for s in dataframe[column]:
                 if pd.isnull(s):
                     continue
                 lines = s.lower()
@@ -429,33 +424,33 @@ if __name__ == "__main__":
             df_cleaned.loc[:, col] = price_temp
             df_cleaned[col].fillna(0, inplace=True)
         # ____________________________________________________________________
-        # df_cleaned[['InvoiceNo', 'Description', 'categ_product', 'categ_0', 'categ_1', 'categ_2', 'categ_3', 'categ_4']][:5]
 
-        # somme des achats / utilisateur & commande
+        # sum of purchases / user & order
         temp = df_cleaned.groupby(by=['CustomerID', 'InvoiceNo'], as_index=False)['TotalPrice'].sum()
         basket_price = temp.rename(columns={'TotalPrice': 'Basket Price'})
         # ___________________________________________________________
-        # pourcentage du prix de la commande / categorie de produit
+        # percentage of order price / product category
         for i in range(5):
             col = 'categ_{}'.format(i)
             temp = df_cleaned.groupby(by=['CustomerID', 'InvoiceNo'], as_index=False)[col].sum()
             basket_price.loc[:, col] = temp[col]
+
+
         # _____________________
-        # date de la commande
+        # date of order
         df_cleaned['InvoiceDate_int'] = df_cleaned['InvoiceDate'].astype('int64')
         temp = df_cleaned.groupby(by=['CustomerID', 'InvoiceNo'], as_index=False)['InvoiceDate_int'].mean()
         df_cleaned.drop('InvoiceDate_int', axis=1, inplace=True)
         basket_price.loc[:, 'InvoiceDate'] = pd.to_datetime(temp['InvoiceDate_int'])
         # ______________________________________
-        # selection des entrées significatives:
+        # selection of significant entries:
         basket_price = basket_price[basket_price['Basket Price'] > 0]
-        # basket_price.sort_values('CustomerID', ascending=True)[:5]
 
         set_entrainement = basket_price[basket_price['InvoiceDate'] < pd.to_datetime(datetime.date(2011, 10, 1))]
         set_test = basket_price[basket_price['InvoiceDate'] >= pd.to_datetime(datetime.date(2011, 10, 1))]
         basket_price = set_entrainement.copy(deep=True)
 
-        # nb de visites et stats sur le montant du panier / utilisateurs
+        # number of visits and stats on basket amount / users
         transactions_per_user = basket_price.groupby(by=['CustomerID'])['Basket Price'].agg(['count', 'min', 'max', 'mean', 'sum'])
         for i in range(5):
             col = 'categ_{}'.format(i)
@@ -463,7 +458,6 @@ if __name__ == "__main__":
 
         transactions_per_user.reset_index(drop=False, inplace=True)
         basket_price.groupby(by=['CustomerID'])['categ_0'].sum()
-        # transactions_per_user.sort_values('CustomerID', ascending=True)[:5]
 
         last_date = basket_price['InvoiceDate'].max().date()
 
@@ -475,8 +469,6 @@ if __name__ == "__main__":
 
         transactions_per_user.loc[:, 'LastPurchase'] = test2.reset_index(drop=False)['InvoiceDate']
         transactions_per_user.loc[:, 'FirstPurchase'] = test.reset_index(drop=False)['InvoiceDate']
-
-        # transactions_per_user[:5]
 
         n1 = transactions_per_user[transactions_per_user['count'] == 1].shape[0]
         n2 = transactions_per_user.shape[0]
@@ -500,8 +492,6 @@ if __name__ == "__main__":
         clusters_clients = kmeans.predict(scaled_matrix)
         silhouette_avg = silhouette_score(scaled_matrix, clusters_clients)
 
-        # pd.DataFrame(pd.Series(clusters_clients).value_counts(), columns=['nb. de clients']).T
-
         pca = PCA(n_components=6)
         matrix_3D = pca.fit_transform(scaled_matrix)
         mat = pd.DataFrame(matrix_3D)
@@ -515,12 +505,11 @@ if __name__ == "__main__":
 
         merged_df = pd.DataFrame()
         for i in range(n_clusters):
-            test = pd.DataFrame(selected_customers[selected_customers['cluster'] == i].mean())
+            test = pd.DataFrame(selected_customers[selected_customers['cluster'] == i].mean(numeric_only=True))
             test = test.T.set_index('cluster', drop=True)
             test['size'] = selected_customers[selected_customers['cluster'] == i].shape[0]
             merged_df = pd.concat([merged_df, test])
         # _____________________________________________________
-        merged_df.drop('CustomerID', axis=1, inplace=True)
 
         merged_df = merged_df.sort_values('sum')
 
@@ -550,7 +539,7 @@ if __name__ == "__main__":
         else:
             SUFFIX = '_aug'
         newdatafile = os.path.join(p, file_name + SUFFIX + file_extension)
-        print(f'Saving final filtered data to a csv file {newdatafile}...')
+        logger.info(f'Saving final filtered data to a csv file {newdatafile}...')
         selected_customers.to_csv(newdatafile, index=False)
     else:
         selected_customers = pd.read_csv(finaltraindata, encoding="ISO-8859-1",
@@ -566,30 +555,26 @@ if __name__ == "__main__":
             # Regular Training / hyperparamter tuning & model saving
             if algorithm == 'knn':
                 # '''Algorithm = KNeighborsClassifier'''
-                print('Running KNeighborsClassifier ...')
-                #knn = ClassFit(clf=neighbors.KNeighborsClassifier)
+                logger.info('Running KNeighborsClassifier ...')
                 knn = neighbors.KNeighborsClassifier(n_jobs=-1)
     
                 if tuning is True:
                     stime = time.time()
-                    parameters={'n_neighbors' : np.arange(1, 50, 1)}
+                    parameters={'n_neighbors' : np.arange(1, 25, 1)}
                     estimator, model  = hyperparameter_tuning(algorithm=knn, param_grid=parameters , kFold=5)
-                    print(f'====> KNeighborsClassifier Training Time with hyperparameters {time.time()-stime} secs')
+                    logger.info(f'====> KNeighborsClassifier Training Time with hyperparameter tuning {time.time()-stime} secs')
                     save_model(estimator, modelname=knn_model) # model is saved & loaded using joblib
-                    print("KNeighborsClassifier model 'knn_model.joblib' is saved in: /model ")
+                    logger.info("KNeighborsClassifier model 'knn_model.joblib' is saved in: /model ")
 
                 else:
                     if batch_size is None:
                         tuned_params = {'n_neighbors': 1}
                         tuned_model = knn
                         tuned_model.set_params(**tuned_params)
-                        total_time = 0
-                        for i in range(1000):
-                            stime = time.time()
-                            tuned_model.fit(X_train, Y_train)
-                            total_time += time.time()-stime
-                
-                        print(f'====>KNeighborsClassifier Averrage Training Time with best tuned hyper parameters {total_time/1000} secs')
+                        stime = time.time()
+                        tuned_model.fit(X_train, Y_train)
+
+                        logger.info(f'====>KNeighborsClassifier Average Training Time with default hyperparameters {time.time()-stime} secs')
 
                 if tuning is not True and batch_size is not None:
 
@@ -606,29 +591,29 @@ if __name__ == "__main__":
                         total_time += time.time() - stime
                         total_batches += 1
 
-                    print(f'====> KNeighborsClassifier Training Time with batch size {batch_size} is {total_time} secs')
-                    print(f'====>Average Training Time for {total_batches} batches is {total_time/total_batches} secs')
+                    logger.info(f'====> KNeighborsClassifier Training Time with batch size {batch_size} is {total_time} secs')
+                    logger.info(f'====>Average Training Time for {total_batches} batches is {total_time/total_batches} secs')
     
             elif algorithm == 'dtc':
                 # '''Algorithm = DecisionTreeClassifier'''
-                print('Running DecisionTreeClassifier ...')
+                logger.info('Running DecisionTreeClassifier ...')
                 dtc = tree.DecisionTreeClassifier()
     
                 if tuning is True:
                     stime = time.time()
                     parameters={'criterion': ['entropy', 'gini'], 'max_features': ['sqrt', 'log2']}
                     estimator, model = hyperparameter_tuning(algorithm=dtc, param_grid=parameters , kFold=5)
-                    print(f'====> DecisionTreeClassifier Training Time with hyperparameters {time.time()-stime} secs')
+                    logger.info(f'====> DecisionTreeClassifier Training Time with hyperparameter tuning {time.time()-stime} secs')
                     save_model(estimator, modelname=dtc_model) # model is saved & loaded using joblib
-                    print("DecisionTreeClassifier model 'dtc_model.joblib'is saved in: /model ")
+                    logger.info("DecisionTreeClassifier model 'dtc_model.joblib'is saved in: /model ")
                 else:
                     stime = time.time()
                     dtc.fit(X_train, Y_train)
-                    print(f'====> DecisionTreeClassifier Training Time is {time.time()-stime} secs')
+                    logger.info(f'====> DecisionTreeClassifier Training Time with default hyperparameters is {time.time()-stime} secs')
     
             elif algorithm == 'rfc':
                 # '''Algorithm = RandomForestClassifier'''
-                print('Running RandomForestClassifier ...')
+                logger.info('Running RandomForestClassifier ...')
                 rfc = ensemble.RandomForestClassifier(n_jobs=-1)
     
                 if tuning is True:
@@ -638,9 +623,9 @@ if __name__ == "__main__":
                                   'max_features': ['sqrt', 'log2']}
                     stime = time.time()
                     estimator, model = hyperparameter_tuning(algorithm=rfc, param_grid=parameters, kFold=5)
-                    print(f'====> RandomForestClassifier Training Time with hyperparameters {time.time()-stime} secs')
+                    logger.info(f'====> RandomForestClassifier Training Time with hyperparameter tuning {time.time()-stime} secs')
                     save_model(estimator, modelname=rfc_model)  # model is saved & loaded using joblib
-                    print("====> RandomForestClassifier model 'rfc_model.joblib'is saved in: /model ")
+                    logger.info("====> RandomForestClassifier model 'rfc_model.joblib'is saved in: /model ")
 
                 else:
                     if batch_size is None:
@@ -650,8 +635,8 @@ if __name__ == "__main__":
                         tuned_model_rf.set_params(**tuned_params)
                         stime = time.time()
                         tuned_model_rf.fit(X_train, Y_train)
-                        print(f'====> RandomForestClassifier Training Time with best tuned hyper parameters {time.time()-stime} secs')
-                        #print(f'====> RandomForestClassifier Training Time {time.time()-stime} secs')
+                        logger.info(f'====> RandomForestClassifier Training Time with default hyperparameters {time.time()-stime} secs')
+                        #logger.info(f'====> RandomForestClassifier Training Time {time.time()-stime} secs')
 
                 if tuning is not True and batch_size is not None:
 
@@ -663,52 +648,52 @@ if __name__ == "__main__":
                     total_time = 0
                     total_batches = 0
                     for X_batch, Y_batch in batchiterator:
-                        print ("Length X_batch", len(X_batch))
+                        logger.info("Length X_batch", len(X_batch))
                         stime = time.time()
                         tuned_model_rf.fit(X_batch, Y_batch)
                         total_time += time.time() - stime
-                        print ("total time is ", total_time)
+                        logger.info("total time is ", total_time)
                         total_batches += 1
 
-                    print(f'====>RandomForestClassifier Training Time with batch size {batch_size} is {total_time} secs')
-                    print(f'====>Average Training Time for {total_batches} batches is {total_time/total_batches} secs')
+                    logger.info(f'====>RandomForestClassifier Training Time with batch size {batch_size} is {total_time} secs')
+                    logger.info(f'====>Average Training Time for {total_batches} batches is {total_time/total_batches} secs')
 
         elif inference == 'knn_model':
                 X_test = X
                 Y_test = Y
                 loaded_model = load_model(knn_model)
-                print("kNN model loaded successfully")
+                logger.info("kNN model loaded successfully")
                 total_time = 0
                 for i in range(100):
                     stime = time.time()
                     predictions = loaded_model.predict(X_test)
                     total_time += time.time() - stime
-                print(f'====> KNeighborsClassifier Model Average Inference Time is {total_time/100} secs')
-                print(f"====> Accuracy for kNN is: {100 * metrics.accuracy_score(Y_test, predictions)} % ")
-                print(f"====> F1 score for kNN is: { metrics.f1_score(Y_test,predictions,average = 'micro')}")
+                logger.info(f'====> KNeighborsClassifier Model Average Inference Time is {total_time/100} secs')
+                logger.info(f"====> Accuracy for kNN is: {100 * metrics.accuracy_score(Y_test, predictions)} % ")
+                logger.info(f"====> F1 score for kNN is: { metrics.f1_score(Y_test,predictions,average = 'micro')}")
                 
         elif inference == 'dtc_model':
                 X_test = X
                 Y_test = Y
                 loaded_model = load_model(dtc_model)
-                print("Decision Tree Classifier model loaded successfully")
+                logger.info("Decision Tree Classifier model loaded successfully")
                 stime = time.time()
                 predictions = loaded_model.predict(X_test)
-                print(f'====> Decision Tree Classifier Model Inference Time is {time.time()-stime} secs')
-                print(f"====> Accuracy for DTC is: {100 * metrics.accuracy_score(Y_test, predictions)} % ")
-                print(f"====> F1 score for DTC is: { metrics.f1_score(Y_test,predictions,average = 'micro')}")
+                logger.info(f'====> Decision Tree Classifier Model Inference Time is {time.time()-stime} secs')
+                logger.info(f"====> Accuracy for DTC is: {100 * metrics.accuracy_score(Y_test, predictions)} % ")
+                logger.info(f"====> F1 score for DTC is: { metrics.f1_score(Y_test,predictions,average = 'micro')}")
             
         elif inference == 'rfc_model':
                 X_test = X
                 Y_test = Y
                 loaded_model= load_model(rfc_model)
-                print("Random Forest Classifier model loaded successfully")
+                logger.info("Random Forest Classifier model loaded successfully")
                 stime = time.time()
                 predictions = loaded_model.predict(X_test)
-                print(f'====> Ramdom Forest Classifier Model Inference Time is {time.time()-stime} secs')
-                print(f"====> Accuracy for RFC is: {100 * metrics.accuracy_score(Y_test, predictions)} % ")
-                print(f"====> F1 score for RFC is: { metrics.f1_score(Y_test,predictions,average = 'micro')}")
+                logger.info(f'====> Ramdom Forest Classifier Model Inference Time is {time.time()-stime} secs')
+                logger.info(f"====> Accuracy for RFC is: {100 * metrics.accuracy_score(Y_test, predictions)} % ")
+                logger.info(f"====> F1 score for RFC is: { metrics.f1_score(Y_test,predictions,average = 'micro')}")
         else:
-            print("====> Please check whether the correct model file name is passed or not!")
+            logger.info("====> Please check whether the correct model file name is passed or not!")
                
-    print(f'====> Program exeuction time {time.time()-prgstime} secs')
+    logger.info(f'====> Program exeuction time {time.time()-prgstime} secs')

@@ -1,0 +1,9 @@
+name: purchase_prediction_intel
+channels:
+  - intel
+  - conda-forge
+dependencies:
+  - intelpython3_full=2024.0.0=py39_0
+  - pandas=2.1.3
+  - nltk=3.8.1
+  - xlsx2csv=0.8.1
