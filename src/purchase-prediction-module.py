@@ -545,9 +545,9 @@ if __name__ == "__main__":
         selected_customers = pd.read_csv(finaltraindata, encoding="ISO-8859-1",
                                          dtype={'CustomerID': str, 'InvoiceID': str})
 
-        columns = ['mean', 'categ_0', 'categ_1', 'categ_2', 'categ_3', 'categ_4']
+        columns = ['mean', 'categ_0', 'categ_1', 'categ_2', 'categ_3', 'categ_4', 'FirstPurchase', 'cluster']
         X = selected_customers[columns]
-        Y = selected_customers['cluster']
+        Y = selected_customers['LastPurchase']
 
         X_train, X_test, Y_train, Y_test = model_selection.train_test_split(X, Y, train_size=0.8)
         

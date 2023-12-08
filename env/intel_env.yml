@@ -3,7 +3,9 @@ channels:
   - intel
   - conda-forge
 dependencies:
-  - intelpython3_full=2024.0.0=py39_0
+  - python=3.10
+  - intelpython3_core=2024.0.0
+  - scikit-learn-intelex=2024.0.0
   - pandas=2.1.3
   - nltk=3.8.1
   - xlsx2csv=0.8.1

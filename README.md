@@ -14,12 +14,12 @@ The reference kit explores ways to have:
 - Faster model development that helps in building purchase prediction models
 - Performance efficient purchase prediction mechanisms
 
-This Reference Solution approach involves clustering of data in the initial analysis to create the product categories, unsupervised Machine Learning technique (K-Means) is used for this. We also need to create and predict the customer segment based on their purchase which is solved as a classification problem. A K-Means model is used again for the creation of customer segments. The benchmarking is done only for the classifier models involved in predicting the customer segment with the features of known product categories from their product purchase history. For this, multiple below classifiers algorithms are analyzed:
+This Reference Solution approach involves clustering of data in the initial analysis to create the product categories, unsupervised Machine Learning technique (K-Means) is used for this. We also need to create and predict the customer segment based on their purchase which is solved as a classification problem. A K-Means model is used again for the creation of customer segments. The benchmarking is done only for the classifier models involved in predicting the next purchase date with the features of known product categories and customer segments from their product purchase history. For this, multiple below classifiers algorithms are analyzed:
 - K-Nearest Neighbor
 - Decision Tree
 - Random Forest
 
-![image](assets/e2e_flow_optimized.png)
+![image](assets/e2e_flow_2024.png)
 
 The use case extends to demonstrate the advantages of using the Intel® oneAPI AI Analytics Toolkit on the task of building a targeted understanding of customer characteristics from purchase data. The savings gained from using the Intel® Extension for Scikit-learn can lead an analyst to more efficiently explore and understand customer archetypes, leading to better and more precise targeted solutions.
 
@@ -58,7 +58,11 @@ The dimension of the dataset is (541909, 8). Each record in the dataset represen
 - CustomerID: Unique Customer ID
 - Country: Country of the purchase
 
-At first, the above features are used to create unique categories of products from the product stock code and product description corpus. Once the product categories are identified, every invoice purchase is re-arranged to include the category of the products bought. Based on the categories of the product the customer segmentation is created. Based on these categorical features (Product Category and Customer Segmentation) multiple classification models are developed that allow to predict the purchases that will be made by a new customer during their next visit, based on the segment on which the customer is expected to be. This will allow retailers to provide offers only for the predicted purchase.
+At first, the above features are used to create unique categories of products from the product stock code and product description corpus. Once the product categories are identified, every invoice purchase is re-arranged to include the category of the products bought. Based on the categories of the product the customer segmentation is created. Based on these categorical features (Product Category and Customer Segmentation) multiple classification models are developed that allow to predict when the next purchases will take place by a customer. This will allow retailers to provide offers only for the predicted purchase date. This process can be shown as:
+
+**Raw Inputs**                                 | **Inputs**                                 | **Output** |
+| :---: | :---: | :---: |
+| `[InvoiceNo,StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country]`          | `[mean,categ_0,categ_1,categ_2,categ_3,categ_4,FirstPurchase,cluster]`          | `[LastPurchase]`
 
 ### ***Hyperparameter Analysis***
 In realistic scenarios, an analyst will run the same Machine Learning algorithm multiple times on the same dataset, scanning across different hyperparameters.  To capture this, we measure the total amount of time it takes to generate results across a grid of hyperparameters for a fixed algorithm, which we define as hyperparameter analysis.  In practice, the results of each hyperparameter analysis provides the analyst with many different customer segments and purchase predictions that they can take and further analyze.
@@ -90,7 +94,7 @@ The included code demonstrates a complete framework for:
 1. Setting up a virtual environment for Intel®-accelerated ML.
 2. Preprocessing data using Pandas and NLTK*.
 3. Clustering data to create product categories using Intel® Extension for Scikit-learn*.
-3. Training a kNN, Decision Tree or Random Forest Classifier model for customer segmentation using Intel® Extension for Scikit-learn*.
+3. Training a kNN, Decision Tree or Random Forest Classifier model for purchase prediction using Intel® Extension for Scikit-learn*.
 4. Predicting from the trained model on new data using Intel® Extension for Scikit-learn*.
 
 ## Get Started
@@ -141,8 +145,9 @@ The `$WORKSPACE/env/intel_env.yml` file contains all dependencies to create the 
 
 | **Packages required in YAML file:**                 | **Version:**
 | :---                          | :--
-| `python`  | 3.9
-| `intelpython3_full`  | 2024.0.0
+| `python`  | 3.10
+| `intelpython3_core`  | 2024.0.0
+| `scikit-learn-intelex`  | 2024.0.0
 | `pandas`  | 2.1.3
 | `nltk`  | 3.8.1
 | `xlsx2csv`  | 0.8.1
@@ -216,18 +221,18 @@ Below command can be used to generate different dataset sizes which can be later
 
 [//]: # (capture: baremetal)
 ```sh
-python $WORKSPACE/src/purchase-prediction-module.py -rtd $DATA_DIR/data.csv -daf 20
+python $WORKSPACE/src/purchase-prediction-module.py -rtd $DATA_DIR/data.csv -daf 5
 ```
 
-The above example generates `$DATA_DIR/data_aug_20.csv` dataset which is the 20 fold multiplication of the initial filtered data.
+The above example generates `$DATA_DIR/data_aug_5.csv` dataset which is the 5 fold multiplication of the initial filtered data.
 
 **Training**
 
-Use the below command to run the training with the generated data and default tuned hyperparameters for the algorithm KNeighborClassifier in intel environment.
+Use the below command to run the training with the generated data and default tuned hyperparameters for the algorithm KNeighborClassifier.
 
 [//]: # (capture: baremetal)
 ```sh
-python $WORKSPACE/src/purchase-prediction-module.py -ftd $DATA_DIR/data_aug_20.csv -t 0 -alg knn
+python $WORKSPACE/src/purchase-prediction-module.py -ftd $DATA_DIR/data_aug_5.csv -t 0 -alg knn
 ```
 
 **Hyperparameter tuning**
@@ -236,7 +241,7 @@ In case of hyperparameter tuning mode training, use `-t 1` option. Gridsearch CV
 
 [//]: # (capture: baremetal)
 ```sh
-python $WORKSPACE/src/purchase-prediction-module.py -ftd $DATA_DIR/data_aug_20.csv -t 1 -alg knn
+python $WORKSPACE/src/purchase-prediction-module.py -ftd $DATA_DIR/data_aug_5.csv -t 1 -alg knn
 ```
 
 This will save the trained model in the path /model. i.e. knn_model.joblib will be saved in the path /model. Similarly, we would need to run the same for Decision Tree or Random Forest Classifier algorithms.
@@ -251,7 +256,7 @@ We need to pass the model name as a parameter in the console as shown below for 
 
 [//]: # (capture: baremetal)
 ```sh
-python $WORKSPACE/src/purchase-prediction-module.py -ftd $DATA_DIR/data_aug_20.csv -inf knn_model -l $OUTPUT_DIR/logs/intel.log
+python $WORKSPACE/src/purchase-prediction-module.py -ftd $DATA_DIR/data_aug_5.csv -inf knn_model -l $OUTPUT_DIR/logs/intel.log
 ```
 
 You can use the following command to review the performance of the model:
