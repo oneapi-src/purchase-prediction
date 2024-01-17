@@ -281,7 +281,6 @@ conda deactivate
 conda remove --name purchase_prediction_intel --all -y
 ```
 
-[//]: # (capture: baremetal)
 ```bash
 rm -r $DATA_DIR/*
 rm -r $OUTPUT_DIR/*

@@ -2,7 +2,7 @@
    This code base is adopted from the below notebook
    https://www.kaggle.com/code/fabiendaniel/customer-segmentation/notebook
 '''
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2024 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 
 import os
